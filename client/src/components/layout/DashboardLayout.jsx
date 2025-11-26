@@ -3,9 +3,9 @@ import Topbar from "./Topbar";
 
 export default function DashboardLayout({ children }) {
   return (
-    <div className="flex">
+    <div className="flex bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-slate-100">
       <Sidebar />
-      <div className="flex-1 ml-64 bg-gray-50 min-h-screen">
+      <div className="flex-1 ml-64 min-h-screen">
         <Topbar />
         <main className="p-6">{children}</main>
       </div>

@@ -13,13 +13,18 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
-  const menuItems = [
-    { name: "Dashboard", icon: <LayoutDashboard size={20} />, path: "/doctor/dashboard" },
-    { name: "Appointments", icon: <CalendarDays size={20} />, path: "/appointments" },
-    { name: "Schedule", icon: <Clock size={20} />, path: "/schedule" },
-    { name: "History", icon: <ClipboardList size={20} />, path: "/history" },
-    { name: "Settings", icon: <Settings size={20} />, path: "/settings" },
-  ];
+  const getMenuItems = () => {
+    const dashboardPath = user?.role === "doctor" ? "/doctor/dashboard" : "/patient/dashboard";
+    return [
+      { name: "Dashboard", icon: <LayoutDashboard size={20} />, path: dashboardPath },
+      { name: "Appointments", icon: <CalendarDays size={20} />, path: "/appointments" },
+      { name: "Schedule", icon: <Clock size={20} />, path: "/schedule" },
+      { name: "History", icon: <ClipboardList size={20} />, path: "/history" },
+      { name: "Settings", icon: <Settings size={20} />, path: "/settings" },
+    ];
+  };
+
+  const menuItems = getMenuItems();
 
   const getInitials = (name) =>
     name
@@ -31,11 +36,13 @@ export default function Sidebar() {
       : "U";
 
   return (
-    <div className="w-64 h-screen fixed left-0 top-0 bg-white shadow-lg flex flex-col justify-between border-r border-gray-100">
+    <div className="w-64 h-screen fixed left-0 top-0 bg-white dark:bg-slate-900 shadow-lg flex flex-col justify-between border-r border-gray-100 dark:border-slate-800">
       {/* Logo */}
       <div className="p-6">
         <div className="flex items-center gap-2 mb-10">
-          <span className="text-2xl font-bold text-gray-900">Farmako</span>
+          <span className="text-2xl font-bold text-gray-900 dark:text-slate-50">
+            Farmako
+          </span>
           <span className="text-2xl font-bold text-blue-500">+</span>
         </div>
 
@@ -48,8 +55,8 @@ export default function Sidebar() {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-2 rounded-xl transition-all ${
                   isActive
-                    ? "bg-blue-100 text-blue-700 font-medium"
-                    : "text-gray-600 hover:bg-blue-50 hover:text-blue-600"
+                    ? "bg-blue-100 text-blue-700 font-medium dark:bg-blue-500/10 dark:text-blue-200"
+                    : "text-gray-600 dark:text-slate-300 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-slate-800 dark:hover:text-blue-300"
                 }`
               }
             >
@@ -61,7 +68,7 @@ export default function Sidebar() {
       </div>
 
       {/* Bottom Avatar + Logout */}
-      <div className="p-6 border-t border-gray-100 flex items-center justify-between">
+      <div className="p-6 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-semibold">
             {getInitials(user?.name || "User")}

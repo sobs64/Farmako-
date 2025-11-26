@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "../components/layout/DashboardLayout";
 import { useAuth } from "../context/AuthContext";
 import API from "../services/api";
+import DoctorChatWindow from "../components/DoctorChatWindow";
 import {
   CalendarDays,
   Clock,
@@ -12,12 +13,13 @@ import {
 } from "lucide-react";
 
 export default function DoctorDashboard() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [queue, setQueue] = useState([]);
+  const [queueLoading, setQueueLoading] = useState(true);
   const [schedules, setSchedules] = useState([]);
+  const [schedulesLoading, setSchedulesLoading] = useState(true);
   const [dayOfWeek, setDayOfWeek] = useState("");
   const [selectedSlots, setSelectedSlots] = useState([]);
-  const [loading, setLoading] = useState(true);
 
   const timeOptions = [
     "08:00 AM - 09:00 AM",
@@ -41,22 +43,30 @@ export default function DoctorDashboard() {
   ];
 
   const fetchSchedules = async () => {
+    if (!user?._id) return;
     try {
+      setSchedulesLoading(true);
       const { data } = await API.get(`/schedules/doctor/${user._id}`);
       setSchedules(data.availableSlots || []);
     } catch (err) {
       console.error("Error fetching schedules:", err);
+      setSchedules([]);
+    } finally {
+      setSchedulesLoading(false);
     }
   };
 
   const fetchQueue = async () => {
+    if (!user?._id) return;
     try {
+      setQueueLoading(true);
       const { data } = await API.get(`/appointments/queue/${user._id}`);
       setQueue(data);
     } catch (err) {
       console.error("Error fetching queue:", err);
+      setQueue([]);
     } finally {
-      setLoading(false);
+      setQueueLoading(false);
     }
   };
 
@@ -67,6 +77,11 @@ export default function DoctorDashboard() {
     }
 
     try {
+      if (!user?._id) {
+        alert("Unable to determine doctor. Please log in again.");
+        return;
+      }
+
       await API.post("/schedules", {
         doctorId: user._id,
         dayOfWeek,
@@ -84,29 +99,39 @@ export default function DoctorDashboard() {
   const deleteSchedule = async (slot) => {
     if (!window.confirm("Delete this slot?")) return;
     try {
-      const schedulesData = await API.get(`/schedules/doctor/${user._id}`);
-      const all = schedulesData.data.availableSlots.filter(
-        (s) => !(s.dayOfWeek === slot.dayOfWeek && s.time === slot.time)
-      );
-
-      await API.post("/schedules", {
+      if (!user?._id) return;
+      
+      // Delete the slot from the database using POST with delete action
+      // (Some axios versions don't support DELETE with body)
+      await API.post("/schedules/delete-slot", {
         doctorId: user._id,
         dayOfWeek: slot.dayOfWeek,
-        availableSlots: all
-          .filter((s) => s.dayOfWeek === slot.dayOfWeek)
-          .map((s) => s.time),
+        time: slot.time,
       });
 
+      alert("✅ Slot deleted successfully!");
       fetchSchedules();
     } catch (err) {
       console.error("Error deleting slot:", err);
+      alert(err.response?.data?.message || "Failed to delete slot");
     }
   };
 
   useEffect(() => {
-    fetchQueue();
-    fetchSchedules();
-  }, []);
+    if (!authLoading && user?._id) {
+      fetchQueue();
+      fetchSchedules();
+    }
+  }, [authLoading, user?._id]);
+
+  const orderedSchedules = useMemo(() => {
+    return [...schedules].sort((a, b) => {
+      if (a.dayOfWeek === b.dayOfWeek) {
+        return a.time.localeCompare(b.time);
+      }
+      return days.indexOf(a.dayOfWeek) - days.indexOf(b.dayOfWeek);
+    });
+  }, [schedules]);
 
   const handleSlotChange = (time) => {
     setSelectedSlots((prev) =>
@@ -119,89 +144,122 @@ export default function DoctorDashboard() {
       <div className="space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-50 flex items-center gap-2">
             🩺 Doctor Dashboard
           </h1>
-          <p className="text-gray-500">
+          <p className="text-gray-500 dark:text-slate-300">
             Manage your weekly availability and monitor current patient queue.
           </p>
         </div>
 
         {/* Add Schedule Section */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <h2 className="text-xl font-semibold flex items-center gap-2 mb-4">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700">
+          <h2 className="text-xl font-semibold flex items-center gap-2 mb-4 text-gray-900 dark:text-slate-50">
             <Plus className="text-blue-600" size={20} /> Create New Schedule
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            {/* Day Dropdown */}
-            <select
-              value={dayOfWeek}
-              onChange={(e) => setDayOfWeek(e.target.value)}
-              className="border p-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            >
-              <option value="">Select Day</option>
-              {days.map((day) => (
-                <option key={day} value={day}>
-                  {day}
-                </option>
-              ))}
-            </select>
-
-            {/* Time Slot Multi-Select */}
-            <div className="border rounded-lg p-2 h-40 overflow-y-auto">
-              {timeOptions.map((time) => (
-                <label
-                  key={time}
-                  className="flex items-center gap-2 text-gray-700 mb-1 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedSlots.includes(time)}
-                    onChange={() => handleSlotChange(time)}
-                  />
-                  {time}
-                </label>
-              ))}
+          <div className="space-y-4 mb-2">
+            {/* Day pills */}
+            <div>
+              <p className="text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">
+                Pick a day
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {days.map((day) => {
+                  const active = dayOfWeek === day;
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() => setDayOfWeek(day)}
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium border transition ${
+                        active
+                          ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                          : "border-gray-200 dark:border-slate-600 text-gray-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-700"
+                      }`}
+                    >
+                      {day.slice(0, 3)}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            <button
-              onClick={createSchedule}
-              className="bg-blue-600 text-white rounded-lg px-4 py-2 hover:bg-blue-700 transition self-start"
-            >
-              Add Schedule
-            </button>
-          </div>
+            {/* Time slot chips */}
+            <div>
+              <p className="text-sm font-medium text-gray-700 dark:text-slate-200 mb-2 flex items-center gap-1">
+                <Clock size={14} className="text-blue-600" />
+                Choose time blocks
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {timeOptions.map((time) => {
+                  const active = selectedSlots.includes(time);
+                  return (
+                    <button
+                      key={time}
+                      type="button"
+                      onClick={() => handleSlotChange(time)}
+                      className={`text-xs sm:text-sm px-3 py-2 rounded-xl border transition flex items-center justify-between ${
+                        active
+                          ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                          : "bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-600 text-gray-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-800"
+                      }`}
+                    >
+                      <span>{time}</span>
+                      {active && (
+                        <span className="ml-2 text-[10px] uppercase tracking-wide opacity-80">
+                          Selected
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-          <p className="text-sm text-gray-500">
-            Select one or more time slots for the chosen day.
-          </p>
+            <div className="flex items-center justify-between pt-2">
+              <p className="text-xs text-gray-500 dark:text-slate-400">
+                Click to toggle slots on or off for the selected day. You can
+                add multiple blocks at once.
+              </p>
+              <button
+                onClick={createSchedule}
+                className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm hover:bg-blue-700 transition shadow-sm"
+              >
+                Save schedule
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* My Schedules */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <h2 className="text-xl font-semibold flex items-center gap-2 mb-4">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700">
+          <h2 className="text-xl font-semibold flex items-center gap-2 mb-4 text-gray-900 dark:text-slate-50">
             <CalendarDays className="text-blue-600" size={20} /> My Schedules
           </h2>
 
-          {schedules.length === 0 ? (
-            <p className="text-gray-500 italic">No schedules created yet.</p>
+          {schedulesLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="animate-spin text-blue-600" size={28} />
+            </div>
+          ) : orderedSchedules.length === 0 ? (
+            <p className="text-gray-500 dark:text-slate-300 italic">No schedules created yet.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {schedules.map((slot, index) => (
+              {orderedSchedules.map((slot, index) => (
                 <div
-                  key={index}
-                  className="border border-gray-200 rounded-xl p-4 flex justify-between items-center hover:shadow-md transition"
+                  key={`${slot.dayOfWeek}-${slot.time}-${index}`}
+                  className="border border-gray-200 dark:border-slate-600 rounded-xl p-4 flex justify-between items-center hover:shadow-md transition bg-white dark:bg-slate-900"
                 >
                   <div>
-                    <p className="font-semibold text-gray-800">
+                    <p className="font-semibold text-gray-800 dark:text-slate-50">
                       {slot.dayOfWeek}
                     </p>
-                    <p className="text-sm text-gray-500">{slot.time}</p>
+                    <p className="text-sm text-gray-500 dark:text-slate-400">{slot.time}</p>
                   </div>
                   <button
                     onClick={() => deleteSchedule(slot)}
-                    className="text-red-500 hover:text-red-700"
+                    className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                   >
                     <Trash2 size={16} />
                   </button>
@@ -212,40 +270,42 @@ export default function DoctorDashboard() {
         </div>
 
         {/* Queue Section */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <h2 className="text-xl font-semibold flex items-center gap-2 mb-4">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700">
+          <h2 className="text-xl font-semibold flex items-center gap-2 mb-4 text-gray-900 dark:text-slate-50">
             <ClipboardList className="text-blue-600" size={20} /> Current Queue
           </h2>
-          {loading ? (
+          {queueLoading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="animate-spin text-blue-600" size={28} />
             </div>
           ) : queue.length === 0 ? (
-            <p className="text-gray-500 italic">
+            <p className="text-gray-500 dark:text-slate-300 italic">
               No patients in queue currently.
             </p>
           ) : (
-            <ul className="divide-y divide-gray-100">
+            <ul className="divide-y divide-gray-100 dark:divide-slate-700">
               {queue.map((patient) => (
                 <li
                   key={patient._id}
                   className="flex justify-between items-center py-3"
                 >
                   <div>
-                    <p className="font-medium text-gray-900">
+                    <p className="font-medium text-gray-900 dark:text-slate-50">
                       {patient.patientName}
                     </p>
-                    <p className="text-sm text-gray-500">
-                      {patient.scheduledTime}
+                    <p className="text-sm text-gray-500 dark:text-slate-400">
+                      {patient.scheduledTime
+                        ? new Date(patient.scheduledTime).toLocaleString()
+                        : "Not scheduled"}
                     </p>
                   </div>
                   <span
                     className={`text-sm font-medium px-3 py-1 rounded-full ${
                       patient.status === "waiting"
-                        ? "bg-yellow-100 text-yellow-700"
+                        ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300"
                         : patient.status === "in_progress"
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-green-100 text-green-700"
+                        ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
+                        : "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300"
                     }`}
                   >
                     {patient.status.replace("_", " ")}
@@ -255,6 +315,9 @@ export default function DoctorDashboard() {
             </ul>
           )}
         </div>
+
+        {/* Doctor Chat Window */}
+        <DoctorChatWindow />
       </div>
     </DashboardLayout>
   );

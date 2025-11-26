@@ -10,6 +10,13 @@ const appointmentSchema = new mongoose.Schema(
       type: String,
       enum: ["waiting", "in_progress", "completed"],
       default: "waiting"
+    },
+    remarks: {
+      type: String,
+      default: ""
+    },
+    remarksAddedAt: {
+      type: Date
     }
   },
   { timestamps: true }
