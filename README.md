@@ -377,7 +377,7 @@ This project is licensed under the ISC License.
 
 ## 👥 Authors
 
-- **Farmako+ Team** - *Initial work*
+- **Sohan B** - *Author and Developer*
 
 ## 🙏 Acknowledgments
 
