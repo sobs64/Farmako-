@@ -344,8 +344,7 @@ The client is configured to connect to `http://localhost:5000` by default. If yo
 
 ## 🎥 Video Demo
 
-<iframe width="560" height="315" src="https://youtu.be/q7vUWzGn_xA?si=sfdsneleNGclj3na" 
-title="Farmako+ Demo" frameborder="0" allowfullscreen></iframe>
+[![Farmako+ Demo](https://img.youtube.com/vi/q7vUWzGn_xA/maxresdefault.jpg)](https://www.youtube.com/watch?v=q7vUWzGn_xA)
 
 
 ## 🤝 Contributing
