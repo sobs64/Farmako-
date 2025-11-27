@@ -328,7 +328,7 @@ The client is configured to connect to `http://localhost:5000` by default. If yo
    - Clear browser localStorage
    - Check JWT_SECRET is set in server `.env`
 
-## 📸 Screenshots
+## 🎥 Video Demo
 
 ### Doctor Dashboard
 - Queue management with real-time updates
@@ -341,6 +341,12 @@ The client is configured to connect to `http://localhost:5000` by default. If yo
 - Day-first booking flow
 - Wait time prediction display
 - Appointment history with remarks
+
+## 🎥 Video Demo
+
+<iframe width="560" height="315" src="https://youtu.be/q7vUWzGn_xA?si=sfdsneleNGclj3na" 
+title="Farmako+ Demo" frameborder="0" allowfullscreen></iframe>
+
 
 ## 🤝 Contributing
 
